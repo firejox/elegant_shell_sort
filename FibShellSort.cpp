@@ -152,7 +152,7 @@ void hyfib_shell_sort(It first, It last, Compare comp = Compare()) {
     constexpr auto zero = static_cast<decltype(current_array_size)>(0);
     constexpr auto small_array_size = static_cast<decltype(current_array_size)>(10);
     constexpr auto fib_step = static_cast<ptrdiff_t>(2);
-
+    
     // Same as Variant version of Fibonacci Shell Sort
     if (current_array_size < small_array_size) {
         for (auto i = first + one; i < last; i++) {
@@ -170,6 +170,7 @@ void hyfib_shell_sort(It first, It last, Compare comp = Compare()) {
         }
         return;
     }
+
     auto k = std::lower_bound(table.begin(), table.end(), current_array_size - one);
     decltype(k) insert_lim = table.begin() + static_cast<ptrdiff_t>(!((k - table.begin()) & static_cast<ptrdiff_t>(1)));
 
@@ -192,53 +193,54 @@ void hyfib_shell_sort(It first, It last, Compare comp = Compare()) {
             }
         }
 
-        if (gap > one) {
-            auto lim = *insert_lim;
-            auto i = first + one;
-            for (; i < last; i++) {
-                if (comp(*i, *(i - one))) {
-                    typename std::iterator_traits<It>::value_type v = std::move(*i);
-                    auto j = i;
+        if (gap == one)
+            break;
 
-                    do {
-                        *j = std::move(*(j - one));
-                        j--;
-                        lim--;
-                    } while ((j > first && lim > zero) && comp(v, *(j - one)));
+        auto lim = *insert_lim;
+        auto i = first + one;
+        for (; i < last; i++) {
+            if (comp(*i, *(i - one))) {
+                typename std::iterator_traits<It>::value_type v = std::move(*i);
+                auto j = i;
 
-                    *j = std::move(v);
+                do {
+                    *j = std::move(*(j - one));
+                    j--;
+                    lim--;
+                } while ((j > first && lim > zero) && comp(v, *(j - one)));
 
-                    if (lim == zero)
-                        break;
-                }
+                *j = std::move(v);
+
+                if (lim == zero)
+                    break;
             }
-
-            if (i == last)
-                break;
-
-            lim = *insert_lim;
-
-            for (i = last - one; i > first; i--) {
-                if (comp(*i, *(i - one))) {
-                    typename std::iterator_traits<It>::value_type v = std::move(*i);
-                    auto j = i;
-
-                    do {
-                        *j = std::move(*(j - one));
-                        j++;
-                        lim--;
-                    } while ((j < (last - one) && lim > zero) && comp(*(j + one), v));
-
-                    *j = std::move(v);
-
-                    if (lim == zero)
-                        break;
-                }
-            }
-
-            if (i == first)
-                break;
         }
+
+        if (i == last)
+            return;
+
+        lim = *insert_lim;
+
+        for (i = last - one; i > first; i--) {
+            if (comp(*i, *(i - one))) {
+                typename std::iterator_traits<It>::value_type v = std::move(*i);
+                auto j = i;
+
+                do {
+                    *j = std::move(*(j - one));
+                    j++;
+                    lim--;
+                } while ((j < (last - one) && lim > zero) && comp(*(j + one), v));
+
+                *j = std::move(v);
+
+                if (lim == zero)
+                    break;
+            }
+        }
+
+        if (i == first)
+            return;
     }
 }
 
@@ -386,12 +388,12 @@ namespace Benchmark {
             auto count = std::count_if(tasks.begin(), tasks.end(), [](Task &a) { return a.self->finished; });
 
             if (count > 1)
-                printf("\e[%dA", count-1);
+                printf("\e[%ldA", count-1);
 
             for (auto&& task : tasks) {
                 if (!task.self->finished)
                     break;
-                printf("%*s", longest_name->self->name.size(), task.self->name.c_str());
+                printf("%*s", (int)longest_name->self->name.size(), task.self->name.c_str());
                 
                 auto m = std::log(task.self->mean) / std::log(10);
                 if (m < 3.0)
@@ -414,7 +416,6 @@ namespace Benchmark {
             }
         }
     };
-
 };
 
 
@@ -426,39 +427,210 @@ int main() {
 
     constexpr size_t size = 1000000;
     std::array<int, size> arr;
+    
+    {
+        printf("random integer array with the size %zu\n", size);
 
-    Benchmark::IPS ips { 2s, 5s,
-       [&arr, &gen]() {
-            std::generate(arr.begin(), arr.end(), gen);
-       },
-       std::make_tuple(
-               "fib shell sort", 
-               [&arr](Benchmark::Task& cmp) { 
+        Benchmark::IPS ips { 2s, 5s,
+            [&arr, &gen]() {
+                std::generate(arr.begin(), arr.end(), gen);
+            },
+            std::make_tuple(
+                    "fib shell sort", 
+                    [&arr](Benchmark::Task& cmp) { 
                     fib_shell_sort(arr.begin(), arr.end(), cmp);
-                }),
-       std::make_tuple(
-               "fib shell sort2",
-               [&arr](Benchmark::Task& cmp) {
+                    }),
+            std::make_tuple(
+                    "fib shell sort2",
+                    [&arr](Benchmark::Task& cmp) {
                     fib_shell_sort2(arr.begin(), arr.end(), cmp);
-               }),
-       std::make_tuple(
-               "hyfib shell sort",
-               [&arr](Benchmark::Task& cmp) {
+                    }),
+            std::make_tuple(
+                    "hyfib shell sort",
+                    [&arr](Benchmark::Task& cmp) {
                     hyfib_shell_sort(arr.begin(), arr.end(), cmp);
-               }),
-       std::make_tuple(
-               "std sort",
-               [&arr](Benchmark::Task& cmp) {
+                    }),
+            std::make_tuple(
+                    "std sort",
+                    [&arr](Benchmark::Task& cmp) {
                     std::sort(arr.begin(), arr.end(), cmp);
-               }),
-       std::make_tuple(
-               "std sort heap",
-               [&arr](Benchmark::Task& cmp) { 
+                    }),
+            std::make_tuple(
+                    "std sort heap",
+                    [&arr](Benchmark::Task& cmp) { 
                     std::make_heap(arr.begin(), arr.end(), cmp);
                     std::sort_heap(arr.begin(), arr.end(), cmp); 
-               })};
+                    })};
 
-    ips.run();
+        ips.run();
+    }
+ 
+    {
+        printf("\nascend integer array with the size %zu\n", size);
+
+        Benchmark::IPS ips { 2s, 5s,
+            [&arr](){
+                for (int i = 0; i < size; i++)
+                    arr[i] = i;
+            },
+            std::make_tuple(
+                    "fib shell sort", 
+                    [&arr](Benchmark::Task& cmp) { 
+                    fib_shell_sort(arr.begin(), arr.end(), cmp);
+                    }),
+            std::make_tuple(
+                    "fib shell sort2",
+                    [&arr](Benchmark::Task& cmp) {
+                    fib_shell_sort2(arr.begin(), arr.end(), cmp);
+                    }),
+            std::make_tuple(
+                    "hyfib shell sort",
+                    [&arr](Benchmark::Task& cmp) {
+                    hyfib_shell_sort(arr.begin(), arr.end(), cmp);
+                    }),
+            std::make_tuple(
+                    "std sort",
+                    [&arr](Benchmark::Task& cmp) {
+                    std::sort(arr.begin(), arr.end(), cmp);
+                    }),
+            std::make_tuple(
+                    "std sort heap",
+                    [&arr](Benchmark::Task& cmp) { 
+                    std::make_heap(arr.begin(), arr.end(), cmp);
+                    std::sort_heap(arr.begin(), arr.end(), cmp); 
+                    })};
+
+        ips.run();
+    }
+    
+    {
+        printf("\ndescend integer array with the size %zu\n", size);
+
+        Benchmark::IPS ips { 2s, 5s,
+            [&arr](){
+                for (int i = 0; i < size; i++)
+                    arr[i] = size - i;
+            },
+            std::make_tuple(
+                    "fib shell sort", 
+                    [&arr](Benchmark::Task& cmp) { 
+                    fib_shell_sort(arr.begin(), arr.end(), cmp);
+                    }),
+            std::make_tuple(
+                    "fib shell sort2",
+                    [&arr](Benchmark::Task& cmp) {
+                    fib_shell_sort2(arr.begin(), arr.end(), cmp);
+                    }),
+            std::make_tuple(
+                    "hyfib shell sort",
+                    [&arr](Benchmark::Task& cmp) {
+                    hyfib_shell_sort(arr.begin(), arr.end(), cmp);
+                    }),
+            std::make_tuple(
+                    "std sort",
+                    [&arr](Benchmark::Task& cmp) {
+                    std::sort(arr.begin(), arr.end(), cmp);
+                    }),
+            std::make_tuple(
+                    "std sort heap",
+                    [&arr](Benchmark::Task& cmp) { 
+                    std::make_heap(arr.begin(), arr.end(), cmp);
+                    std::sort_heap(arr.begin(), arr.end(), cmp); 
+                    })};
+
+        ips.run();
+    }
+
+    {
+        printf("\nCubic skew-like integer array with the size %zu\n", size);
+
+        Benchmark::IPS ips { 2s, 5s,
+            [&arr, &gen](){
+                for (int i = 0; i < size; i++) {
+                    double x = (2.0 * double(i) / size) - 1.0;
+                    double v = x * x * x;
+                    double w = (v + 1.0) / 2.0 * size + 1;
+
+                    arr[i] = int(w);
+                }
+
+                std::shuffle(arr.begin(), arr.end(), gen);
+            },
+            std::make_tuple(
+                    "fib shell sort", 
+                    [&arr](Benchmark::Task& cmp) { 
+                    fib_shell_sort(arr.begin(), arr.end(), cmp);
+                    }),
+            std::make_tuple(
+                    "fib shell sort2",
+                    [&arr](Benchmark::Task& cmp) {
+                    fib_shell_sort2(arr.begin(), arr.end(), cmp);
+                    }),
+            std::make_tuple(
+                    "hyfib shell sort",
+                    [&arr](Benchmark::Task& cmp) {
+                    hyfib_shell_sort(arr.begin(), arr.end(), cmp);
+                    }),
+            std::make_tuple(
+                    "std sort",
+                    [&arr](Benchmark::Task& cmp) {
+                    std::sort(arr.begin(), arr.end(), cmp);
+                    }),
+            std::make_tuple(
+                    "std sort heap",
+                    [&arr](Benchmark::Task& cmp) { 
+                    std::make_heap(arr.begin(), arr.end(), cmp);
+                    std::sort_heap(arr.begin(), arr.end(), cmp); 
+                    })};
+
+        ips.run();
+    }
+
+    {
+        printf("\nQuinic skew-like integer array with the size %zu\n", size);
+
+        Benchmark::IPS ips { 2s, 5s,
+            [&arr, &gen](){
+                for (int i = 0; i < size; i++) {
+                    double x = (2.0 * double(i) / size) - 1.0;
+                    double v = x * x * x * x * x;
+                    double w = (v + 1.0) / 2.0 * size + 1;
+
+                    arr[i] = int(w);
+                }
+
+                std::shuffle(arr.begin(), arr.end(), gen);
+            },
+            std::make_tuple(
+                    "fib shell sort", 
+                    [&arr](Benchmark::Task& cmp) { 
+                    fib_shell_sort(arr.begin(), arr.end(), cmp);
+                    }),
+            std::make_tuple(
+                    "fib shell sort2",
+                    [&arr](Benchmark::Task& cmp) {
+                    fib_shell_sort2(arr.begin(), arr.end(), cmp);
+                    }),
+            std::make_tuple(
+                    "hyfib shell sort",
+                    [&arr](Benchmark::Task& cmp) {
+                    hyfib_shell_sort(arr.begin(), arr.end(), cmp);
+                    }),
+            std::make_tuple(
+                    "std sort",
+                    [&arr](Benchmark::Task& cmp) {
+                    std::sort(arr.begin(), arr.end(), cmp);
+                    }),
+            std::make_tuple(
+                    "std sort heap",
+                    [&arr](Benchmark::Task& cmp) { 
+                    std::make_heap(arr.begin(), arr.end(), cmp);
+                    std::sort_heap(arr.begin(), arr.end(), cmp); 
+                    })};
+
+        ips.run();
+    }
+
 
     return 0;
 }
