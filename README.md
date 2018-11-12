@@ -1,8 +1,8 @@
 # Elegant Shell Sort
 
 Elegant Shell Sort is [Shell Sort](https://en.wikipedia.org/wiki/Shellsort) 
-with the gaps of Fibonacci sequences. The worst case performance is **O(n(lg n)^2)** 
-and the lower bound of the average performance is **Omega(nlg n)** according to Jiang-Li-Vitányi's formula.
+with the gaps of Fibonacci sequences. ~~The worst case performance is O(n(lg n)^2)~~  
+(unclarified) and the lower bound of the average performance is **Omega(nlg n)** according to Jiang-Li-Vitányi's formula.
 Although the upper bound of the average complexity is open question, it may be an option for effiecient sort.
 
 ---
