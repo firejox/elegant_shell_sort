@@ -393,25 +393,25 @@ namespace Benchmark {
                     (((I <= x) && 
                       (([&]()constexpr ->bool{
                         printf("%*s", (int)lntsk, task_func::of::name);
-                        auto m = std::log(task_func::mean) / std::log(10);
+                        auto m = task_func::mean;
 
-                        if (m < 3.0)
+                        if (m < 1.e3)
                         printf(" %6.2lf  (%6.2lfs )", task_func::mean, 1 / task_func::mean);
-                        else if (m < 6.0)
-                        printf(" %6.2lfk (%6.2lfms)", task_func::mean/1'000, 1'000 / task_func::mean);
-                        else if (m < 9.0)
-                        printf(" %6.2lfM (%6.2lfus)", task_func::mean/1'000'000, 1'000'000 / task_func::mean);
+                        else if (m < 1.e6)
+                        printf(" %6.2lfk (%6.2lfms)", task_func::mean / 1.e3, 1.e3 / task_func::mean);
+                        else if (m < 1.e9)
+                        printf(" %6.2lfM (%6.2lfus)", task_func::mean / 1.e6, 1.e6 / task_func::mean);
                         else
-                        printf(" %6.2lfG (%6.2lfns)", task_func::mean/1'000'000'000, 1'000'000 / task_func::mean);
+                        printf(" %6.2lfG (%6.2lfns)", task_func::mean / 1.e9, 1.e9 / task_func::mean);
 
                         printf(" (±%5.2lf%%)", task_func::relative_stddev);
 
                         printf(" cmp: %14.2lf", task_func::average_count);
 
                         if (ftsk == task_func::size)
-                        printf(" %*s fastest\n", sz + 3, "");
+                            printf(" %*s fastest\n", sz + 3, "");
                         else
-                        printf(" %*.2lf× slower\n", sz, (double)ftsk / task_func::size);
+                            printf(" %*.2lf× slower \n", sz, (double)ftsk / task_func::size);
 
                         return true;
                       })())) &&...);
