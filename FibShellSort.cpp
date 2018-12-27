@@ -16,219 +16,57 @@
 #include "TokudaShellSort.hpp"
 #include "FibFuzzyShellSort.hpp"
 
-namespace FibonacciNS {
-    // Fibonacci number generator
-    //
-    template <class Numeric, size_t sz>
-        struct Number {
-            static constexpr Numeric value = Number<Numeric, sz-1>::value + Number<Numeric, sz-2>::value;
-        };
+namespace FibNS {
+    using namespace IntegralConstantArithmetic;
+    
+    template <class N, size_t sz>
+    struct Number {
+        using type = add_t<typename Number<N, sz - 1>::type, typename Number<N, sz - 2>::type>;
+    };
 
-    template<class Numeric>
-        struct Number<Numeric, 0> {
-            static constexpr Numeric value = 1;
-        };
+    template <class N>
+    struct Number<N, 0> {
+        using type = IC<N, 1>;
+    };
 
-    template<class Numeric>
-        struct Number<Numeric, 1> {
-            static constexpr Numeric value = 1;
-        };
+    template <class N>
+    struct Number<N, 1> {
+        using type = IC<N, 2>;
+    };
+    
+    template <class Numeric = int>
+    class Sequence {
+        // Fibonacci number generator
+        //
+        
+        static constexpr size_t table_size() {
+            constexpr Numeric max_num = std::numeric_limits<Numeric>::max();
+            Numeric f0(1), f1(2), f2(1);
 
-    // Build Fibonacci Table
-    //
-    template <class Numeric=int>
-        struct Table {
-            static constexpr size_t table_size() {
-                constexpr Numeric max_num = std::numeric_limits<Numeric>::max();
-                Numeric f0(1), f1(1), f2(1);
-                size_t sz = 2;
-                while ((max_num - f1) >= f0) {
-                    f2 = f1 + f0;
-                    f0 = f1;
-                    f1 = f2;
-                    sz++;
-                }
-
-                return sz;
+            size_t sz = 2;
+            while ((max_num - f1) >= f0) {
+                f2 = f1 + f0;
+                f0 = f1;
+                f1 = f2;
+                sz++;
             }
 
-            template <std::size_t ...I>
-                static constexpr auto gen_table(std::index_sequence<I...>) {
-                    return std::array<Numeric, sizeof...(I)>{Number<Numeric, I>::value...};   
-                }
+            return sz;
+        }
+        template <size_t ...I>
+        static constexpr decltype(auto) gen_seq(std::index_sequence<I...>) {
+            return std::integer_sequence<Numeric, Number<Numeric, sizeof...(I) - I - 1>::type::value...>{};
+        }
 
-            constexpr static auto table = gen_table(std::make_index_sequence<table_size()>());
-        };
+        public:
+        using type = decltype(gen_seq(std::make_index_sequence<table_size()>())); 
+    };
 
+    template<class Iterator, class Comparator=std::less<>>
+    void shellsort(Iterator first, Iterator last, Comparator comp = Comparator()) noexcept {
+        ShellSortTemplate::sort<Iterator, Sequence<typename std::iterator_traits<Iterator>::difference_type>, Comparator>(first, last, comp);
+    }
 };
-
-
-// Original version of Fibonacci Shell sort
-//
-template <typename It, typename Compare = std::less<typename std::iterator_traits<It>::value_type>>
-void fib_shell_sort(It first, It last, Compare comp = Compare()) {
-    typename std::iterator_traits<It>::difference_type current_array_size = std::distance(first, last);
-
-    constexpr auto& table = FibonacciNS::Table<decltype(current_array_size)>::table;
-    constexpr auto one = static_cast<decltype(current_array_size)>(1);
-
-    for (auto k = std::prev(std::lower_bound(table.begin(), table.end(), current_array_size)); k > table.begin(); k--) {
-        const auto gap = *k;
-        const auto h = first + gap;
-
-        for (auto i = h; i < last; i++) {
-            if (comp(*i, *(i - gap))) {
-                typename std::iterator_traits<It>::value_type v = std::move(*i);
-
-                auto j = i;
-
-                do {
-                    *j = std::move(*(j - gap));
-                    j -= gap;
-                } while (j >= h && comp(v, *(j - gap)));
-
-                *j = std::move(v);
-            }
-        }
-    }
-}
-// Variant version of Fibonacci Shell sort
-//  Shell sort with the gap of two step Fibonacci number
-//  becuse the Fibonacci number F_2n = \sum_{i=1}^{n} F_2i
-//
-template <typename It, typename Compare = std::less<typename std::iterator_traits<It>::value_type>>
-void fib_shell_sort2(It first, It last, Compare comp = Compare()) {
-    typename std::iterator_traits<It>::difference_type current_array_size = std::distance(first, last);
-
-    constexpr auto& table = FibonacciNS::Table<decltype(current_array_size)>::table;
-    constexpr auto one = static_cast<decltype(current_array_size)>(1);
-    constexpr auto small_array_size = static_cast<decltype(current_array_size)>(10);
-
-    // Because it is hard to maintain the correctness under the small array,
-    // I use insertion sort to handle it.
-    if (current_array_size < small_array_size) {
-        for (auto i = first + one; i < last; i++) {
-            if (comp(*i, *(i - one))) {
-                typename std::iterator_traits<It>::value_type v = std::move(*i);
-                auto j = i;
-
-                do {
-                    *j = std::move(*(j - one));
-                    j--;
-                } while (j > first && comp(v, *(j - one)));
-
-                *j = std::move(v);
-            }
-        }
-        return;
-    }
-
-    for (auto k = std::lower_bound(table.begin(), table.end(), current_array_size - one); k >= table.begin(); k-= ptrdiff_t(2)) {
-        const auto gap = *k;
-
-        for (auto i = first + gap, h = i; i < last; i++) {
-            if (comp(*i, *(i - gap))) {
-                typename std::iterator_traits<It>::value_type v = std::move(*i);
-
-                auto j = i;
-
-                do {
-                    *j = std::move(*(j - gap));
-                    j -= gap;
-                } while (j >= h && comp(v, *(j - gap)));
-
-                *j = std::move(v);
-            }
-        }
-    }
-}
-
-// Hybrid verion
-//  Combine insertion sort into shell sort loop to give better 
-//  performance on nearly sorted array.
-//
-template <typename It, typename Compare = std::less<typename std::iterator_traits<It>::value_type>>
-void hyfib_shell_sort(It first, It last, Compare comp = Compare()) {
-    typename std::iterator_traits<It>::difference_type current_array_size = std::distance(first, last);
-
-    constexpr auto& table = FibonacciNS::Table<decltype(current_array_size)>::table;
-    constexpr auto one = static_cast<decltype(current_array_size)>(1);
-    constexpr auto zero = static_cast<decltype(current_array_size)>(0);
-    constexpr auto small_array_size = static_cast<decltype(current_array_size)>(10);
-    constexpr auto fib_step = static_cast<ptrdiff_t>(2);
-    constexpr auto t_begin = table.begin();
-
-    // Same as Variant version of Fibonacci Shell Sort
-    if (current_array_size < small_array_size) {
-        for (auto i = first + one; i < last; i++) {
-            if (comp(*i, *(i - one))) {
-                typename std::iterator_traits<It>::value_type v = std::move(*i);
-                auto j = i;
-
-                do {
-                    *j = std::move(*(j - one));
-                    j--;
-                } while (j > first && comp(v, *(j - one)));
-
-                *j = std::move(v);
-            }
-        }
-        return;
-    }
-
-    auto k = std::lower_bound(table.begin(), table.end(), current_array_size - one);
-    decltype(k) insert_lim = table.begin() + static_cast<ptrdiff_t>(!((k - table.begin()) & static_cast<ptrdiff_t>(1)));
-    decltype(current_array_size) next_iter = zero;
-    decltype(current_array_size) lim;
-    decltype(first) i, j;
-
-    for (; k >= t_begin; k-= fib_step, insert_lim += fib_step) {
-        const auto gap = *k;
-        const auto h = first + std::max(gap, next_iter);
-
-        for (i = h; i < last; i++) {
-            if (comp(*i, *(i - gap))) {
-                typename std::iterator_traits<It>::value_type v = std::move(*i);
-
-                j = i;
-
-                do {
-                    *j = std::move(*(j - gap));
-                    j -= gap;
-                } while (j >= h && comp(v, *(j - gap)));
-
-                *j = std::move(v);
-            }
-        }
-
-        if (gap == one)
-            break;
-
-        lim = *insert_lim;
-        for (i = first + one; i < last; i++) {
-            if (comp(*i, *(i - one))) {
-                auto v = std::move(*i);
-                j = i;
-
-                do {
-                    *j = std::move(*(j - one));
-                    j--;
-                    lim--;
-                } while (j > first && comp(v, *(j - one)));
-
-                *j = std::move(v);
-
-                if (lim < one)
-                    break;
-            }
-        }
-
-        if (i == last)
-            return;
-        next_iter = i - first;
-    }
-}
-
 
 namespace Benchmark {
     using TimeUnit = std::chrono::duration<double, std::milli>;
@@ -474,7 +312,7 @@ int main() {
                 Task2 {
                     tname("fib shell sort"),
                     [](auto& cmp) { 
-                        fib_shell_sort(arr.begin(), arr.end(), cmp);
+                        FibNS::shellsort(arr.begin(), arr.end(), cmp);
                     }
                 },
                 Task2 {
@@ -523,7 +361,7 @@ int main() {
                 Task2 {
                     tname("fib shell sort"),
                     [](auto& cmp) { 
-                        fib_shell_sort(arr.begin(), arr.end(), cmp);
+                        FibNS::shellsort(arr.begin(), arr.end(), cmp);
                     }
                 },
                 Task2 {
@@ -571,7 +409,7 @@ int main() {
                 Task2 {
                     tname("fib shell sort"),
                     [](auto& cmp) { 
-                        fib_shell_sort(arr.begin(), arr.end(), cmp);
+                        FibNS::shellsort(arr.begin(), arr.end(), cmp);
                     }
                 },
                 Task2 {
@@ -627,7 +465,7 @@ int main() {
                 Task2 {
                     tname("fib shell sort"),
                     [](auto& cmp) { 
-                        fib_shell_sort(arr.begin(), arr.end(), cmp);
+                        FibNS::shellsort(arr.begin(), arr.end(), cmp);
                     }
                 },
                 Task2 {
@@ -683,7 +521,7 @@ int main() {
                 Task2 {
                     tname("fib shell sort"),
                     [](auto& cmp) { 
-                        fib_shell_sort(arr.begin(), arr.end(), cmp);
+                        FibNS::shellsort(arr.begin(), arr.end(), cmp);
                     }
                 },
                 Task2 {
@@ -736,7 +574,7 @@ int main() {
                 Task2 {
                     tname("fib shell sort"),
                     [&i](auto& cmp) { 
-                        fib_shell_sort(arr.begin(), arr.begin() + i, cmp);
+                        FibNS::shellsort(arr.begin(), arr.begin() + i, cmp);
                     }
                 },
                 Task2 {
